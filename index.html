@@ -444,34 +444,338 @@ body.book #toc,body.book #preamble,body.book h1.sect0,body.book .sect1>h2{page-b
 <div class="ulist">
 <ul>
 <li>
-<p>explicacao</p>
+<p>Utilizando o programa exemplos/dft.cpp que foi mencionado no exercicio como referencia, sao feitas poucas alteracoes no algoritmo para chegar-se numa solucao.</p>
 </li>
 </ul>
 </div>
+<div class="paragraph">
+<p>O programa para resolucao do problema, possui 3 funcoes basicas, que sao deslocaDFT(Mat&amp;), Filtro() e  Mudanca(char ,char ).</p>
+</div>
+<div class="paragraph">
+<p>Na funcao Filtro(), eh utilizado um filtro homomorfico, cujo valores padroes das variaveis gH (gama high), gL (gama low), Do e c, sao  2.0, 0.5, 8, 1 respectivamente.</p>
+</div>
+<div class="paragraph">
+<p>A formula adotada para o filtro eh:</p>
+</div>
+<div class="paragraph">
+<p><span class="image"><img src="formula.png" alt="formula"></span></p>
+</div>
+<div class="paragraph">
+<p>Eh realizado um procedimento de transofrmada de Fourier, e logo em seguida os quadrantes dessa tranformada sao trocados na funcao  deslocaDFT(). O filtro eh aplicado e na imagem; Seus quadrantes invertidos novamente e em seguida aplicado a tranformada inversa de Fourier. Esse ciclo se repete, sempre que uma determinada sequencia de teclas for apertada. As sequencias sao</p>
+</div>
+<div class="paragraph">
+<p>c + a: Significa um aumento da variavel c (+0.5).
+c + m: Significa uma diminuicao da variavel c (-0.5).</p>
+</div>
+<div class="paragraph">
+<p>d + a: Significa um aumento da variavel d (+0.5).
+d + m: Significa uma diminuicao da variavel d (-0.5).</p>
+</div>
+<div class="paragraph">
+<p>g + a: Significa um aumento da variavel gH (+0.5).
+g + m: Significa uma diminuicao da variavel gH(-0.5).</p>
+</div>
+<div class="paragraph">
+<p>l + a: Significa um aumento da variavel gL (+0.5).
+l + m: Significa uma diminuicao da variavel gL (-0.5).</p>
+</div>
 <div class="listingblock">
 <div class="content">
-<pre class="highlight"><code class="language-c++" data-lang="c++">cout &lt;&lt; "Add as coordenadas (x1,y1): ";
-cin &gt;&gt; x1;
-cin&gt;&gt; y1;
-cout &lt;&lt; "Add com as coordenadas (x2,y2): ";
-cin &gt;&gt; x2;
-cin&gt;&gt; y2;</code></pre>
+<pre class="highlight"><code class="language-c++" data-lang="c++">void Filtro(){
+	for(;;){
+		// prepara filtro homomorfico
+		for(int i=0; i&lt;dft_M; i++){
+			for(int j=0; j&lt;dft_N; j++){
+				radius = (double) (i-dft_M/2)*(i-dft_M/2)+(j-dft_N/2)*(j-dft_N/2);
+				tmp.at&lt;float&gt; (i,j) = (gH-gL)*(1-exp(-c*(radius/pow(Do,2))))+gL;
+			}
+		  }
+		  // cria a matriz com as componentes do filtro e junta
+		  // ambas em uma matriz multicanal complexa
+		  Mat comps[]= {tmp, tmp};
+		  merge(comps, 2, filter);
+		// realiza o padding da imagem
+		copyMakeBorder(image, padded, 0,
+					   dft_M - image.rows, 0,
+					   dft_N - image.cols,
+					   BORDER_CONSTANT, Scalar::all(0));
+		// limpa o array de matrizes que vao compor a
+		// imagem complexa
+		planos.clear();
+		// cria a compoente real
+		realInput = Mat_&lt;float&gt;(padded);
+		// insere as duas componentes no array de matrizes
+		planos.push_back(realInput);
+		planos.push_back(zeros);
+		// combina o array de matrizes em uma unica
+		// componente complexa
+		merge(planos, complexImage);
+		// calcula o dft
+		dft(complexImage, complexImage);
+		// realiza a troca de quadrantes
+		deslocaDFT(complexImage);
+		// aplica o filtro frequencial
+		mulSpectrums(complexImage,filter,complexImage,0);
+		// limpa o array de planos
+		planos.clear();
+		// separa as partes real e imaginaria para modifica-las
+		split(complexImage, planos);
+		// recompoe os planos em uma unica matriz complexa
+		merge(planos, complexImage);
+		// troca novamente os quadrantes
+		deslocaDFT(complexImage);
+		cout &lt;&lt; complexImage.size().height &lt;&lt; endl;
+		// calcula a DFT inversa
+		idft(complexImage, complexImage);
+		// limpa o array de planos
+		planos.clear();
+		// separa as partes real e imaginaria da
+		// imagem filtrada
+		split(complexImage, planos);
+		// normaliza a parte real para exibicao
+		normalize(planos[0], planos[0], 0, 1, CV_MINMAX);
+		imshow("filtrada", planos[0]);
+			printf("gH: %f &lt;&gt; gL: %f &lt;&gt; c: %f &lt;&gt; Do: %f \n",gH,gL,c,Do);
+		variavel = (char) waitKey(0);
+		if( variavel == 27 )
+			break;
+    variacao = (char) waitKey(0);
+    if( variavel== 27 )
+			break;
+		Mudanca(variavel,variacao);
+	}</code></pre>
+</div>
+</div>
+<div class="paragraph">
+<p>}</p>
+</div>
+<div class="paragraph">
+<p>A funcao Mudanca(), apenas realiza os testes e atribui os valores dos parametros para a mudanca no filtro.</p>
+</div>
+<div class="listingblock">
+<div class="content">
+<pre class="highlight"><code class="language-c++" data-lang="c++">void Mudanca(char variavel,char variacao){
+	novoTeste=true;
+	switch(variavel){
+    // aumenta e diminuicao do c
+    case 'c':
+      if(variacao =='a')
+      c=c+0.5;
+      else if(variacao =='m')
+      c=c-0.5;
+      break;
+    // aumenta e diminuicao do Do
+    case 'd':
+      if(variacao =='a')
+      Do=Do+0.5;
+      else if(variacao =='m')
+      Do=Do-0.5;
+      break;
+    // aumenta e diminuicao do gH
+    case 'g':
+      if(variacao =='a')
+      gH=gH+0.5;
+      else if(variacao =='m')
+      gH=gH-0.5;
+      break;
+   // aumenta e diminuicao do  gama High
+    case 'l':
+      if(variacao =='a')
+      gL=gL+0.5;
+      else if(variacao =='m')
+      gL=gL-0.5;
+      break;
+    }
+}</code></pre>
 </div>
 </div>
 <div class="paragraph">
 <p>PRINTS:</p>
 </div>
 <div class="paragraph">
-<p><span class="image"><img src="biel.png" alt="biel"></span>
-<span class="image"><img src="Exer3.1Resultado.png" alt="Exer3.1Resultado"></span></p>
+<p><span class="image"><img src="essar.png" alt="essar"></span></p>
 </div>
 <div class="paragraph">
 <p>Codigo completo:</p>
 </div>
 <div class="listingblock">
 <div class="content">
-<pre class="highlight"><code class="language-c++" data-lang="c++">#include &lt;iostream&gt;</code></pre>
+<pre class="highlight"><code class="language-c++" data-lang="c++">#include &lt;iostream&gt;
+#include &lt;opencv2/opencv.hpp&gt;
+#include &lt;cmath&gt;
+#include &lt;opencv2/imgproc/imgproc.hpp&gt;
+#define RADIUS 20
+using namespace cv;
+using namespace std;
+  VideoCapture cap;
+  Mat imaginaryInput, complexImage, multsp;
+  Mat padded, filter, mag;
+  Mat image, imagegray, tmp;
+  Mat_&lt;float&gt; realInput, zeros;
+  vector&lt;Mat&gt; planos;
+  float gH,gL,Do,c;
+  double radius;
+  char TrackbarName[50];
+   // valores ideais dos tamanhos da imagem
+  // para calculo da DFT
+  int dft_M, dft_N;
+  // guarda tecla capturada
+  char variavel,variacao;
+  bool novoTeste;
+  void Mudanca(char variavel,char variacao);
+  // troca os quadrantes da imagem da DFT
+void deslocaDFT(Mat&amp; image ){
+  Mat tmp, A, B, C, D;
+  // se a imagem tiver tamanho impar, recorta a regiao para
+  // evitar copias de tamanho desigual
+  image = image(Rect(0, 0, image.cols &amp; -2, image.rows &amp; -2));
+  int cx = image.cols/2;
+  int cy = image.rows/2;
+  // reorganiza os quadrantes da transformada
+  // A B   -&gt;  D C
+  // C D       B A
+  A = image(Rect(0, 0, cx, cy));
+  B = image(Rect(cx, 0, cx, cy));
+  C = image(Rect(0, cy, cx, cy));
+  D = image(Rect(cx, cy, cx, cy));
+  // A &lt;-&gt; D
+  A.copyTo(tmp);  D.copyTo(A);  tmp.copyTo(D);
+  // C &lt;-&gt; B
+  C.copyTo(tmp);  B.copyTo(C);  tmp.copyTo(B);
+}
+void Filtro(){
+	for(;;){
+			  // prepara filtro homomorfico
+		  for(int i=0; i&lt;dft_M; i++){
+			for(int j=0; j&lt;dft_N; j++){
+				radius = (double) (i-dft_M/2)*(i-dft_M/2)+(j-dft_N/2)*(j-dft_N/2);
+				tmp.at&lt;float&gt; (i,j) = (gH-gL)*(1-exp(-c*(radius/pow(Do,2))))+gL;
+			}
+		  }
+		  // cria a matriz com as componentes do filtro e junta
+		  // ambas em uma matriz multicanal complexa
+		  Mat comps[]= {tmp, tmp};
+		  merge(comps, 2, filter);
+		// realiza o padding da imagem
+		copyMakeBorder(image, padded, 0,
+					   dft_M - image.rows, 0,
+					   dft_N - image.cols,
+					   BORDER_CONSTANT, Scalar::all(0));
+		// limpa o array de matrizes que vao compor a
+		// imagem complexa
+		planos.clear();
+		// cria a compoente real
+		realInput = Mat_&lt;float&gt;(padded);
+		// insere as duas componentes no array de matrizes
+		planos.push_back(realInput);
+		planos.push_back(zeros);
+		// combina o array de matrizes em uma unica
+		// componente complexa
+		merge(planos, complexImage);
+		// calcula o dft
+		dft(complexImage, complexImage);
+		// realiza a troca de quadrantes
+		deslocaDFT(complexImage);
+		// aplica o filtro frequencial
+		mulSpectrums(complexImage,filter,complexImage,0);
+		// limpa o array de planos
+		planos.clear();
+		// separa as partes real e imaginaria para modifica-las
+		split(complexImage, planos);
+		// recompoe os planos em uma unica matriz complexa
+		merge(planos, complexImage);
+		// troca novamente os quadrantes
+		deslocaDFT(complexImage);
+		cout &lt;&lt; complexImage.size().height &lt;&lt; endl;
+		// calcula a DFT inversa
+		idft(complexImage, complexImage);
+		// limpa o array de planos
+		planos.clear();
+		// separa as partes real e imaginaria da
+		// imagem filtrada
+		split(complexImage, planos);
+		// normaliza a parte real para exibicao
+		normalize(planos[0], planos[0], 0, 1, CV_MINMAX);
+		imshow("filtrada", planos[0]);
+			printf("gH: %f &lt;&gt; gL: %f &lt;&gt; c: %f &lt;&gt; Do: %f \n",gH,gL,c,Do);
+		variavel = (char) waitKey(0);
+		if( variavel == 27 )
+			break;
+    variacao = (char) waitKey(0);
+    if( variavel== 27 )
+			break;
+    		Mudanca(variavel,variacao);
+	}
+}
+int main(int argc, char**argv){
+    // captura uma imagem para recuperar as
+  image= imread(argv[1],CV_LOAD_IMAGE_GRAYSCALE);
+  //mostra imagem original
+  imshow("original", image);
+  // ganho inicial do ruido
+  gH=2.0;
+  gL=0.5;
+  Do=8;
+  c=1;
+  printf("Ref gH: %f &lt;&gt; gL: %f &lt;&gt; c: %f &lt;&gt; Do: %f \n",gH,gL,c,Do);
+  // identifica os tamanhos otimos para
+  // calculo do FFT
+  dft_M = getOptimalDFTSize(image.rows);
+  dft_N = getOptimalDFTSize(image.cols);
+  // realiza o padding da imagem
+  copyMakeBorder(image, padded, 0,
+                 dft_M - image.rows, 0,
+                 dft_N - image.cols,
+                 BORDER_CONSTANT, Scalar::all(0));
+  // parte imaginaria da matriz complexa (preenchida com zeros)
+  zeros = Mat_&lt;float&gt;::zeros(padded.size());
+  // prepara a matriz complexa para ser preenchida
+  complexImage = Mat(padded.size(), CV_32FC2, Scalar(0));
+  // a funÃ§Ã£o de transferÃªncia (filtro frequencial) deve ter o
+  // mesmo tamanho e tipo da matriz complexa
+  filter = complexImage.clone();
+  // cria uma matriz temporÃ¡ria para criar as componentes real
+  // e imaginaria do filtro ideal
+  tmp = Mat(dft_M, dft_N, CV_32F);
+  Filtro();
+  return 0;
+}
+void Mudanca(char variavel,char variacao){
+	novoTeste=true;
+	switch(variavel){
+    // aumenta e diminuicao do c
+    case 'c':
+      if(variacao =='a')
+      c=c+0.5;
+      else if(variacao =='m')
+      c=c-0.5;
+      break;
+    // aumenta e diminuicao do Do
+    case 'd':
+      if(variacao =='a')
+      Do=Do+0.5;
+      else if(variacao =='m')
+      Do=Do-0.5;
+      break;
+    // aumenta e diminuicao do gH
+    case 'g':
+      if(variacao =='a')
+      gH=gH+0.5;
+      else if(variacao =='m')
+      gH=gH-0.5;
+      break;
+   // aumenta e diminuicao do  gama High
+    case 'l':
+      if(variacao =='a')
+      gL=gL+0.5;
+      else if(variacao =='m')
+      gL=gL-0.5;
+      break;
+    }</code></pre>
 </div>
+</div>
+<div class="paragraph">
+<p>}</p>
 </div>
 </div>
 </div>
